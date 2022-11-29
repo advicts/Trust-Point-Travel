@@ -16,7 +16,7 @@ class ProductProduct(models.Model):
 
 class StockRuleExt(models.Model):
     _inherit = 'stock.rule'
-    
+
     @api.model
     def _run_buy(self, procurements):
         procurements_by_po_domain = defaultdict(list)
@@ -114,6 +114,7 @@ class StockRuleExt(models.Model):
             for product, po_lines in grouped_po_lines:
                 po_lines_by_product[product] = self.env['purchase.order.line'].concat(*po_lines)
             po_line_values = []
+
             for procurement in procurements:
                 po_lines = po_lines_by_product.get(procurement.product_id.id, self.env['purchase.order.line'])
                 po_line = po_lines._find_candidate(*procurement)
@@ -124,7 +125,6 @@ class StockRuleExt(models.Model):
                     vals = self._update_purchase_order_line(procurement.product_id,
                         procurement.product_qty, procurement.product_uom, company_id,
                         procurement.values, po_line)
-                    import pdb;pdb.set_trace()
                     po_line.write(vals)
                 else:
                     if float_compare(procurement.product_qty, 0, precision_rounding=procurement.product_uom.rounding) <= 0:
@@ -137,14 +137,27 @@ class StockRuleExt(models.Model):
                     po_line_values.append(self.env['purchase.order.line']._prepare_purchase_order_line_from_procurement(
                         procurement.product_id, procurement.product_qty,
                         procurement.product_uom, procurement.company_id,
-                        procurement.values, po))
-                    
+                        procurement.values, po, order_line.net_total_supplier))
+
                     # Check if we need to advance the order date for the new line
                     order_date_planned = procurement.values['date_planned'] - relativedelta(
                         days=procurement.values['supplier'].delay)
                     if fields.Date.to_date(order_date_planned) < fields.Date.to_date(po.date_order):
                         po.date_order = order_date_planned
             self.env['purchase.order.line'].sudo().create(po_line_values)
+
+
+class PurchaseOrderLine(models.Model):
+
+    _inherit = 'purchase.order.line'
+
+    @api.model
+    def _prepare_purchase_order_line_from_procurement(self, product_id, product_qty, product_uom, company_id, values, po, price_unit=False):
+        res = super(PurchaseOrderLine, self)._prepare_purchase_order_line_from_procurement(product_id, product_qty, product_uom, company_id, values, po)
+        if price_unit:
+            res['price_unit'] = price_unit
+        return res
+
 
 
 class SaleOrder(models.Model):
