@@ -1,0 +1,25 @@
+<odoo>
+	<data>
+
+		<record id="action_class_config" model="ir.actions.act_window">
+			<field name="name">Airline Class</field>
+			<field name="res_model">sale.airline.class</field>
+			<field name="view_mode">tree,form</field>
+		</record>
+		<record id="action_fare_basis_config" model="ir.actions.act_window">
+			<field name="name">Fare Basis</field>
+			<field name="res_model">sale.airline.fare.basis</field>
+			<field name="view_mode">tree,form</field>
+		</record>
+		<record id="action_routing_config" model="ir.actions.act_window">
+			<field name="name">Airline Routing</field>
+			<field name="res_model">sale.airline.routing</field>
+			<field name="view_mode">tree,form</field>
+		</record>
+
+		<menuitem id="menu_routing_configuration" parent="sale.menu_sale_config" name="Airline Routing" action="action_routing_config"/>
+		<menuitem id="menu_fare_basis_configuration" parent="sale.menu_sale_config" name="Airline Fare Basis" action="action_fare_basis_config"/>
+		<menuitem id="menu_class_configuration" parent="sale.menu_sale_config" name="Airline Class" action="action_class_config"/>
+
+	</data>
+</odoo>
