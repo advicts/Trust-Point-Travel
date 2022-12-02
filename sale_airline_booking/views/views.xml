@@ -2,6 +2,21 @@
 	<data>
 		<!-- explicit list view definition -->
 
+		
+		<record model="ir.ui.view" id="inherit_res_user_form_view">
+			<field name="name">Inherited Res Users Form View</field>
+			<field name="model">res.users</field>
+			<field name="inherit_id" ref="base.view_users_form"/>
+			<field name="arch" type="xml">
+				<xpath expr="//group[@name='preferences']" position="after">
+					<group string="Commissions">
+						<field name="sale_commission_percent"/>
+					</group>
+				</xpath>
+			</field>
+		</record>
+
+
 		<record model="ir.ui.view" id="inherited_product_product_form_view">
 			<field name="name">Inherited Product Form View Airline Booking</field>
 			<field name="model">product.product</field>
@@ -21,6 +36,10 @@
 				<field name="tax_totals" position="before">
 					<field name="net_total_supplier" widget="monetary"/>
 					<field name="uatp_amount" widget="monetary"/>
+					<field name="sale_commission_amount" widget="monetary"/>
+				</field>
+				<field name="user_id" position="after">
+					<field name="sale_commission_percent"/>
 				</field>
 				<xpath expr="//field[@name='order_line']/tree" position="attributes">
 					<attribute name="editable"></attribute>

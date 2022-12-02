@@ -159,10 +159,35 @@ class PurchaseOrderLine(models.Model):
         return res
 
 
+class ResUser(models.Model):
+
+    _inherit = 'res.users'
+
+    sale_commission_percent = fields.Float("Sales Commission %")
+
+class AccountTax(models.Model):
+
+    _inherit = 'account.tax'
+
+    @api.model
+    def _compute_taxes_for_single_line(self, base_line, handle_price_include=True, include_caba_tags=False, early_pay_discount_computation=None, early_pay_discount_percentage=None):
+        to_update_vals, tax_values_list = super(AccountTax, self)._compute_taxes_for_single_line(base_line=base_line, handle_price_include=handle_price_include, include_caba_tags=include_caba_tags, early_pay_discount_computation=early_pay_discount_computation, early_pay_discount_percentage=early_pay_discount_percentage)
+        to_update_vals['price_subtotal'] = base_line['price_subtotal']
+        to_update_vals['price_total'] = base_line['price_subtotal']
+        return to_update_vals, tax_values_list
 
 class SaleOrder(models.Model):
 
     _inherit = "sale.order"
+
+    @api.depends('order_line.tax_id', 'order_line.price_unit', 'amount_total', 'amount_untaxed')
+    def _compute_tax_totals(self):
+        for order in self:
+            order_lines = order.order_line.filtered(lambda x: not x.display_type)
+            order.tax_totals = self.env['account.tax']._prepare_tax_totals(
+                [x._convert_to_tax_base_line_dict() for x in order_lines],
+                order.currency_id,
+            )
 
     @api.depends("order_line.uatp_amount", "order_line.net_total_supplier")
     def _compute_uatp_amount(self):
@@ -180,18 +205,38 @@ class SaleOrder(models.Model):
     uatp_amount = fields.Monetary("Total UATP Amount", compute="_compute_uatp_amount")
     net_total_supplier = fields.Monetary("Supplier Net Total", compute="_compute_uatp_amount")
 
-class SaleOrder(models.Model):
-    _inherit = 'sale.order'
-    amount_untaxed = fields.Monetary(string="Untaxed Amount", store=True, compute='_compute_amounts', tracking=5)
-    amount_tax = fields.Monetary(string="Taxes", store=True, compute='_compute_amounts')
-    amount_total = fields.Monetary(string="Total", store=True, compute='_compute_amounts', tracking=4)
+    sale_commission_percent = fields.Float("Sale Commission Percent", related="user_id.sale_commission_percent")
+
+    @api.depends("amount_total", "sale_commission_percent")
+    def _compute_sale_commission_amount(self):
+        for order in self:
+            sale_commission_amount = float()
+            if order.sale_commission_percent and order.amount_total:
+                sale_commission_amount = (order.sale_commission_percent / 100) * order.amount_total
+
+            order.update({
+                    'sale_commission_amount':sale_commission_amount
+                })
+
+    sale_commission_amount = fields.Monetary("Sales Commission Amount", compute="_compute_sale_commission_amount")
 
 class SaleOrderLine(models.Model):
 
     _inherit = "sale.order.line"
 
+    @api.onchange("ticket_no", "pnr", "pax_name")
+    def onchange_ticket_pax_pnr(self):
+        name = str()
+        if self.ticket_no:
+            name += "{}/".format(self.ticket_no)
+        if self.pnr:
+            name += "{}/".format(self.pnr)
+        if self.pax_name:
+            name += "{}".format(self.pax_name)
+        self.name = name
+
     maturity_period = fields.Integer("Maturity Period", default=0)
-    supplier_id = fields.Many2one("res.partner", domain=[("supplier_rank", ">", 0)] ,required=True)
+    supplier_id = fields.Many2one("res.partner", domain=False ,required=True)
     routing_id = fields.Many2one("sale.airline.routing")
     ticket_no = fields.Char("Ticket No.")
     pax_name = fields.Char("Pax Name")
@@ -279,6 +324,11 @@ class SaleOrderLine(models.Model):
     
     fare_tax = fields.Monetary("Fare + Taxes", compute="_compute_amount")
     service_charge_amount = fields.Float("Service Charge Amount", compute="_compute_amount")
+
+    def _prepare_invoice_line(self, **optional_values):
+        res = super(SaleOrderLine, self)._prepare_invoice_line(**optional_values)
+        res['price_unit'] = self.price_subtotal
+        return res
 
 class AirlineRouting(models.Model):
 
